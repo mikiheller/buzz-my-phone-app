@@ -30,13 +30,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-notifications",
-        {
-          "sounds": []
-        }
-      ]
+      "expo-router"
     ]
   }
 }
