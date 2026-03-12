@@ -1,5 +1,35 @@
 import { supabase } from '../config/supabase';
 
+const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
+
+const LEVEL_TITLES = {
+  nudge: '👋 Nudge',
+  hey: '📳 Hey!',
+  urgent: '🚨 URGENT',
+  emergency: '🆘 EMERGENCY',
+};
+
+async function sendPushNotification(pushToken, level, message, buzzId) {
+  if (!pushToken) return;
+
+  try {
+    await fetch(EXPO_PUSH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: pushToken,
+        title: LEVEL_TITLES[level] || '📳 Buzz',
+        body: message || LEVEL_TITLES[level],
+        sound: 'default',
+        priority: level === 'emergency' || level === 'urgent' ? 'high' : 'default',
+        data: { buzzId, level, message, type: 'buzz' },
+      }),
+    });
+  } catch (e) {
+    console.warn('Push notification failed (buzz still sent):', e);
+  }
+}
+
 export async function sendBuzz(senderId, receiverId, level, message = '') {
   const { data, error } = await supabase
     .from('buzzes')
@@ -15,9 +45,13 @@ export async function sendBuzz(senderId, receiverId, level, message = '') {
 
   if (error) throw error;
 
-  await supabase.functions.invoke('send-buzz-notification', {
-    body: { buzzId: data.id, receiverId, level, message },
-  });
+  const { data: receiver } = await supabase
+    .from('profiles')
+    .select('push_token')
+    .eq('id', receiverId)
+    .single();
+
+  await sendPushNotification(receiver?.push_token, level, message, data.id);
 
   return data;
 }
